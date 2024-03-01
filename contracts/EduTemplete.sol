@@ -11,14 +11,35 @@ import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/ext
 contract EduTemplate is AccessControlDefaultAdminRules{
 
     //以下是角色定义部分，每个角色以32字节作为标识，考虑做成常量，如果有新增角色定义，照着下方代码修改即可
-    //管理员角色默认是合约的部署者，在构造函数中被初始化赋值，管理员角色可以给其他账户赋予角色和收回角色权限
+    //管理员角色默认是合约的部署者，在构造函数中被初始化赋值，管理员角色可以给其他账户赋予角色和收回角色权限，包括临时权限
     bytes32 public constant STUDENT_ROLE = keccak256("STUDENT");//student
     bytes32 public constant TEACHER_ROLE = keccak256("TEACHER");//teacher
-    bytes32 public constant STUDENT_MANAGER_ROLE = keccak256("STUDENT_MANAGE");//student manager
-    bytes32 public constant TEACHER_MANAGER_ROLE = keccak256("TEACHER_MANAGER");//teacher manager
-    bytes32 public constant FINANCIAL_STUFF_ROLE = keccak256("FINANCIAL_STUFF");//financial stuff
-    bytes32 public constant FINANCIAL_REVIEWER_ROLE = keccak256("FINANCIAL_REVIEWER");//financial reviewer
+    bytes32 public constant MANAGEMENT_STUFF_ROLE = keccak256("MANAGEMENT_STUFF");//management stuff
     uint256 public nextRoleId;
+
+    enum stuType {
+        undergraduate,
+        postgraduate,
+        phd
+    }
+
+    struct studentData {
+        uint256 id;
+        string name;
+        uint256 age;
+        uint256 enrollTime;
+        string major;
+        stuType stype;
+        bool status;
+    }
+
+    struct teacherData {
+        uint256 id;
+        string name;
+        uint256 age;
+        string department;
+        bool status;
+    }
 
     mapping(uint256 => bytes32) roles;
     mapping(address => mapping(uint256 => uint256)) tempRoles;
@@ -26,11 +47,8 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     constructor()AccessControlDefaultAdminRules(3 days,msg.sender){
         roles[0] = STUDENT_ROLE;
         roles[1] = TEACHER_ROLE;
-        roles[2] = STUDENT_MANAGER_ROLE;
-        roles[3] = TEACHER_MANAGER_ROLE;
-        roles[4] = FINANCIAL_STUFF_ROLE;
-        roles[5] = FINANCIAL_REVIEWER_ROLE;
-        nextRoleId = 6;
+        roles[2] = MANAGEMENT_STUFF_ROLE;
+        nextRoleId = 3;
     }
 
     //修饰器
@@ -72,4 +90,15 @@ contract EduTemplate is AccessControlDefaultAdminRules{
             tempRoles[_toAddr][_roleId] = _expireTime;
         }
     }
+
+    // 学生相关方法 包括学籍注册/验证、毕业设计论文管理、毕业申请、奖学金申请、成绩管理、财务报销申请等
+    
+    // 教师相关方法 包括在岗信息注册/验证、学生及其成果管理、组成学位申请答辩临时委员会、表决答辩结果
+
+    // 行政管理人员相关方法 审核报销申请、审核奖学金申请、材料存证/公证、数字毕业证书发放与验证
+
+
+
+
+
 }
