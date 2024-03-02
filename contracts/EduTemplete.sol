@@ -4,11 +4,14 @@ pragma solidity ^0.8.24;
 // Uncomment this line to use console.log
 import "hardhat/console.sol";
 import {AccessControlDefaultAdminRules} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import "./strings.sol";
 
 //本合约模板的使用场景为教育领域，基于openzeppelin合约库中的AccessControlDefaultAdminRules标准合约模板进行开发
 //使用AccessControlDefaultAdminRules标准合约模板的目的在于便捷地对使用场景中的角色进行定义、授权等一系列权限访问控制
 //为了尽可能地简化开发流程和降低开发难度，本合约对部分实现细节做了一些简化，实际应用时可根据具体需求对数据结构进行一些调整
 contract EduTemplate is AccessControlDefaultAdminRules{
+
+    using strings for *;
 
     //以下是角色定义部分，每个角色以32字节作为标识，考虑做成常量，如果有新增角色定义，照着下方代码修改即可
     //管理员角色默认是合约的部署者，在构造函数中被初始化赋值，管理员角色可以给其他账户赋予角色和收回角色权限，包括临时权限
@@ -17,24 +20,18 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     bytes32 public constant MANAGEMENT_STUFF_ROLE = keccak256("MANAGEMENT_STUFF");//management stuff
     uint256 public nextRoleId;
 
-    enum stuType {
-        undergraduate,
-        postgraduate,
-        phd
-    }
-
     struct studentData {
-        uint256 id;
+        address addr;
         string name;
         uint256 age;
         uint256 enrollTime;
         string major;
-        stuType stype;
+        string stuType;//undergraduate,postgraduate,phd
         bool status;
     }
 
     struct teacherData {
-        uint256 id;
+        address addr;
         string name;
         uint256 age;
         string department;
@@ -43,6 +40,8 @@ contract EduTemplate is AccessControlDefaultAdminRules{
 
     mapping(uint256 => bytes32) roles;
     mapping(address => mapping(uint256 => uint256)) tempRoles;
+    mapping(address => studentData) stuSets;
+    mapping(address => teacherData) thrSets;
 
     constructor()AccessControlDefaultAdminRules(3 days,msg.sender){
         roles[0] = STUDENT_ROLE;
@@ -54,6 +53,18 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     //修饰器
     modifier roleValidCheck(uint256 _roleId) {
         require(_roleId >= 0 && _roleId < nextRoleId,"Error: Invalid role id.");
+        _;
+    }
+
+    modifier checkStuType(string memory _type) {
+        string memory s1 = "undergraduate";
+        string memory s2 = "postgraduate";
+        string memory s3 = "phd";
+        bool res = false;
+        res = res || _type.toSlice().equals(s1.toSlice());
+        res = res || _type.toSlice().equals(s2.toSlice());
+        res = res || _type.toSlice().equals(s3.toSlice());
+        require(res == true,"Error: Invalid student type.");
         _;
     }
 
@@ -92,9 +103,35 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     }
 
     // 学生相关方法 包括学籍注册/验证、毕业设计论文管理、毕业申请、奖学金申请、成绩管理、财务报销申请等
-    
-    // 教师相关方法 包括在岗信息注册/验证、学生及其成果管理、组成学位申请答辩临时委员会、表决答辩结果
+    function stuRegister(address _stuAddr,string memory _name,uint256 _age,string memory _major,string memory _type)
+    public onlyRole(DEFAULT_ADMIN_ROLE) checkStuType(_type){
+        require(checkRole(_stuAddr, 0) == false,"Error: This address has already been registered as a student.");
+        studentData memory d = studentData(_stuAddr,_name,_age,block.timestamp,_major,_type,true);
+        stuSets[_stuAddr] = d;
+        grantRole(roles[0], _stuAddr);
+    }
 
+    function stuVerify(address _stuAddr) public view returns(bool) {
+        if(checkRole(_stuAddr, 0) == true){
+            return stuSets[_stuAddr].status && stuSets[_stuAddr].enrollTime >= block.timestamp;
+        }else{
+            return false;
+        }
+    }
+    // 教师相关方法 包括在岗信息注册/验证、学生及其成果管理、组成学位申请答辩临时委员会、表决答辩结果
+    function thrRegister(address _thrAddr,string memory _name,uint256 _age,string memory _department)
+    public onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(checkRole(_thrAddr, 1) == false,"Error: This address has already been registered as a teacher.");
+        teacherData memory d = teacherData(_thrAddr,_name,_age,_department,true);
+        thrSets[_thrAddr] = d;
+        grantRole(roles[1], _thrAddr);
+    }
+
+    function thrVerify(address _thrAddr) public view returns(bool) {
+        return checkRole(_thrAddr,1);
+    }
+    
+    
     // 行政管理人员相关方法 审核报销申请、审核奖学金申请、材料存证/公证、数字毕业证书发放与验证
 
 
