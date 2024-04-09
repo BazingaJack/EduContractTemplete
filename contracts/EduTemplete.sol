@@ -85,19 +85,19 @@ contract EduTemplate is AccessControlDefaultAdminRules{
         uint256 result;//0:unqualified 1:qualified 2:good 3:excellent
     }
 
-    mapping(uint256 => bytes32) roles;
-    mapping(address => mapping(uint256 => uint256)) tempRoles;
-    mapping(address => studentData) stuSets;
-    mapping(address => teacherData) thrSets;
-    mapping(address => managerData) mgrSets;
-    mapping(uint256 => course) courses;
-    mapping(address => mapping(uint256 => uint256)) stuGrades;
-    mapping(uint256 => mapping(address => bool)) courseStuSets;
-    mapping(uint256 => scholarship) scholarships;
-    mapping(uint256 => mapping(address => uint256)) applyList;
-    mapping(uint256 => thesis) thesisSets;
-    mapping(uint256 => reviewRecord[]) thesisResults;
-    mapping(address => bytes32) certificates;
+    mapping(uint256 => bytes32) public roles;
+    mapping(address => mapping(uint256 => uint256)) public tempRoles;
+    mapping(address => studentData) public stuSets;
+    mapping(address => teacherData) public thrSets;
+    mapping(address => managerData) public mgrSets;
+    mapping(uint256 => course) public courses;
+    mapping(address => mapping(uint256 => uint256)) public stuGrades;
+    mapping(uint256 => mapping(address => bool)) public courseStuSets;
+    mapping(uint256 => scholarship) public scholarships;
+    mapping(uint256 => mapping(address => uint256)) public applyList;
+    mapping(uint256 => thesis) public thesisSets;
+    mapping(uint256 => reviewRecord[]) public thesisResults;
+    mapping(address => bytes32) public certificates;
 
     constructor()AccessControlDefaultAdminRules(3 days,msg.sender){
         roles[0] = STUDENT_ROLE;
@@ -129,7 +129,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     //以下是和权限管理相关方法，暂不支持级联授权
 
     //checkRole函数用于检查给定的地址是否拥有某个角色权限
-    function checkRole(address _checkAddr,uint256 _roleId) public view onlyRole(DEFAULT_ADMIN_ROLE) roleValidCheck(_roleId) returns(bool) {
+    function checkRole(address _checkAddr,uint256 _roleId) public view roleValidCheck(_roleId) returns(bool) {
         return hasRole(roles[_roleId], _checkAddr);
     }
 
@@ -178,13 +178,13 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     }
 
     function selectCourse(uint256 _courseId) public onlyRole(roles[0]){
-        require(_courseId < nextCourseId,"Error: Invalid course id.");
+        require(_courseId < nextCourseId && _courseId >= 0,"Error: Invalid course id.");
         require(courseStuSets[_courseId][msg.sender] == false,"Error: This student has already selected this course.");
         courseStuSets[_courseId][msg.sender] = true;
     }
 
     function applyScholarship(uint256 _scholarshipId) public onlyRole(roles[0]) {
-        require(_scholarshipId < nextScholarshipId,"Error: Invalid scholarship id.");
+        require(_scholarshipId < nextScholarshipId && _scholarshipId >= 0,"Error: Invalid scholarship id.");
         require(applyList[_scholarshipId][msg.sender] == 0,"Error: You have applied for this scholarship.");
         scholarships[_scholarshipId].applyer.push(msg.sender);
         applyList[_scholarshipId][msg.sender] = stuSets[msg.sender].averageGrade;
@@ -194,16 +194,17 @@ contract EduTemplate is AccessControlDefaultAdminRules{
         require(checkRole(_thrAddr, 1) == true,"Error: This teacher doesn't exist.");
         thesis memory t = thesis(nextThesisId,msg.sender,_thrAddr,_title,_content,0);
         thesisSets[nextThesisId] = t;
+        stuSets[msg.sender].thesisId = nextThesisId;
         nextThesisId++;
     }
 
     function modifyThesis(string memory _content) public onlyRole(roles[0]) {
-        require(stuSets[msg.sender].thesisId > 0,"Error: Could not find corresponding thesis.");
+        require(stuSets[msg.sender].thesisId > 0 || (stuSets[msg.sender].thesisId == 0 && nextThesisId == 1),"Error: Could not find corresponding thesis.");
         thesisSets[stuSets[msg.sender].thesisId].content = _content;
     }
 
     function thesisSubmit() public onlyRole(roles[0]) {
-        require(stuSets[msg.sender].thesisId > 0,"Error: Could not find corresponding thesis.");
+        require(stuSets[msg.sender].thesisId > 0 || (stuSets[msg.sender].thesisId == 0 && nextThesisId == 1),"Error: Could not find corresponding thesis.");
         require(thesisSets[stuSets[msg.sender].thesisId].status == 0,"Error: Invalid status.");
         thesisSets[stuSets[msg.sender].thesisId].status = 1;
     }
@@ -229,7 +230,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
 
     function recordScores(address _stuAddr,uint256 _courseId,uint256 _grade) public onlyRole(roles[1]) {
         require(stuVerify(_stuAddr) == true,"Error: This address owner isn't a student.");
-        require(_courseId < nextCourseId,"Error: Invalid course id.");
+        require(_courseId < nextCourseId && _courseId >= 0,"Error: Invalid course id.");
         require(courses[_courseId].teacherAddr == msg.sender,"Error: You aren't the manager of this course.");
         require(courseStuSets[_courseId][_stuAddr] == true,"Error: This student hasn't selected this course.");
         if(_grade < 60) {
@@ -242,7 +243,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
 
     function reviewThesis(address _stuAddr,uint256 _reviewResult) public onlyRole(roles[1]) {
         require(stuVerify(_stuAddr) == true,"Error: This address owner isn't a student.");
-        require(stuSets[_stuAddr].thesisId > 0,"Error: Could not find corresponding thesis.");
+        require(stuSets[msg.sender].thesisId > 0 || (stuSets[msg.sender].thesisId == 0 && nextThesisId == 1),"Error: Could not find corresponding thesis.");
         require(thesisSets[stuSets[_stuAddr].thesisId].status == 1,"Error: Invalid status.");
         require(thesisSets[stuSets[_stuAddr].thesisId].thrAddr == msg.sender,"Error: You can't review your student's thesis.");
         thesis memory t = thesisSets[stuSets[_stuAddr].thesisId];
@@ -262,7 +263,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
         require(checkRole(_mgrAddr, 2) == false,"Error: This address has already been registered as a manager.");
         managerData memory d = managerData(_mgrAddr,_name,_department,true);
         mgrSets[_mgrAddr] = d;
-        grantRole(roles[0], _mgrAddr);
+        grantRole(roles[2], _mgrAddr);
     }
 
     function addScholarship(string memory _name,uint256 _amount) public onlyRole(roles[2]) {
@@ -273,7 +274,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     }
 
     function chooseCandidate(uint256 _scholarshipId) public onlyRole(roles[2]) {
-        require(_scholarshipId < nextScholarshipId,"Error: Invalid scholarship id.");
+        require(_scholarshipId < nextScholarshipId && _scholarshipId >= 0,"Error: Invalid scholarship id.");
         require(scholarships[_scholarshipId].status == 0,"Error: This scholarship has already been processed.");
         require(scholarships[_scholarshipId].applyer.length > 0,"Error: This scholarship hasn't applyer yet.");
         address winer = scholarships[_scholarshipId].applyer[0];
@@ -292,7 +293,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     }
 
     function distributeScholarship(uint256 _scholarshipId) public onlyRole(roles[2]){
-        require(_scholarshipId < nextScholarshipId,"Error: Invalid scholarship id.");
+        require(_scholarshipId < nextScholarshipId && _scholarshipId >= 0,"Error: Invalid scholarship id.");
         require(scholarships[_scholarshipId].status == 1,"Error: This scholarship hasn't been processed.");
         address winer = scholarships[_scholarshipId].winer;
         stuSets[winer].scholarshipAmount += scholarships[_scholarshipId].amount;
