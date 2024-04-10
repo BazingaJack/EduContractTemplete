@@ -170,11 +170,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     }
 
     function stuVerify(address _stuAddr) public view returns(bool) {
-        if(checkRole(_stuAddr, 0) == true){
-            return stuSets[_stuAddr].status && stuSets[_stuAddr].enrollTime >= block.timestamp;
-        }else{
-            return false;
-        }
+        return checkRole(_stuAddr, 0);
     }
 
     function selectCourse(uint256 _courseId) public onlyRole(roles[0]){

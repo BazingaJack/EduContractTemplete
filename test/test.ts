@@ -2,6 +2,7 @@ import {loadFixture} from "@nomicfoundation/hardhat-network-helpers";
 import {expect} from "chai";
 import {ethers} from "hardhat";
 import { ContractFactory } from "ethers";
+import { access } from "../typechain-types/@openzeppelin/contracts";
 
 describe("Education Template Contract deployed", async function () {
     // We define a fixture to reuse the same setup in every test.
@@ -79,6 +80,65 @@ describe("Education Template Contract deployed", async function () {
             await edutemplate.connect(accounts.undergraduate).thesisSubmit();
             const status = (await edutemplate.thesisSets(0)).status;
             expect (status).to.be.equal(1);
+        })
+
+    })
+
+    describe("Teacher relevant basic function test",async function () {
+        it("Should register course successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            const nextId = await edutemplate.nextCourseId();
+            expect (nextId).to.be.equal(1);
+            const coursename = (await edutemplate.courses(0)).name;
+            expect (coursename).to.be.equal("Course1");
+            const credit = (await edutemplate.courses(0)).credit;
+            expect (credit).to.be.equal(2);
+        })
+
+        it("Should select course successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            await edutemplate.connect(accounts.undergraduate).selectCourse(0);
+            const res = await edutemplate.courseStuSets(0,accounts.undergraduate.address);
+            expect (res).to.be.equal(true);
+        })
+
+        it("Should record scores successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            await edutemplate.connect(accounts.undergraduate).selectCourse(0);
+            await edutemplate.connect(accounts.postgraduate).selectCourse(0);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.undergraduate.address,0,90);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.postgraduate.address,0,50);
+            const status1 = (await edutemplate.stuSets(accounts.undergraduate.address)).status;
+            const status2 = (await edutemplate.stuSets(accounts.postgraduate.address)).status;
+            expect (status1).to.be.equal(true);
+            expect (status2).to.be.equal(false);
+            const average1 = (await edutemplate.stuSets(accounts.undergraduate.address)).averageGrade;
+            const average2 = (await edutemplate.stuSets(accounts.postgraduate.address)).averageGrade;
+            expect (average1).to.be.equal(90);
+            expect (average2).to.be.equal(50);
+            const totalCredit1 = (await edutemplate.stuSets(accounts.undergraduate.address)).totalCredit;
+            const totalCredit2 =(await edutemplate.stuSets(accounts.postgraduate.address)).totalCredit;
+            expect (totalCredit1).to.be.equal(2);
+            expect (totalCredit2).to.be.equal(2);
+            const grade1 = (await edutemplate.stuGrades(accounts.undergraduate.address,0));
+            const grade2 =(await edutemplate.stuGrades(accounts.postgraduate.address,0));
+            expect (grade1).to.be.equal(90);
+            expect (grade2).to.be.equal(50);
+        })
+
+        it("Should review thesis successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.undergraduate).thesisInitialize(accounts.teacher.address,"Title","Content");
+            await edutemplate.connect(accounts.undergraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.undergraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher).reviewThesis(accounts.undergraduate.address,3);
+            const teacherAddress = (await edutemplate.thesisResults(0,0)).thrAddr;
+            const res = (await edutemplate.thesisResults(0,0)).result;
+            expect (teacherAddress).to.be.equal(accounts.teacher.address);
+            expect (res).to.be.equal(3);
         })
 
     })
