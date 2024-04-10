@@ -244,7 +244,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
         require(stuVerify(_stuAddr) == true,"Error: This address owner isn't a student.");
         require(stuSets[msg.sender].thesisId > 0 || (stuSets[msg.sender].thesisId == 0 && nextThesisId == 1),"Error: Could not find corresponding thesis.");
         require(thesisSets[stuSets[_stuAddr].thesisId].status == 1,"Error: Invalid status.");
-        require(thesisSets[stuSets[_stuAddr].thesisId].thrAddr == msg.sender,"Error: You can't review your student's thesis.");
+        require(thesisSets[stuSets[_stuAddr].thesisId].thrAddr != msg.sender,"Error: You can't review your student's thesis.");
         thesis memory t = thesisSets[stuSets[_stuAddr].thesisId];
         reviewRecord memory r = reviewRecord(msg.sender,t.id,_reviewResult);
         thesisResults[t.id].push(r);
@@ -322,7 +322,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
                 }else score += records[i].result;
             }
             if(score < 7) res = false;
-        }else{//
+        }else{
             uint256 score = 0;
             for(uint256 i = 0;i < records.length;i++){//至少2A3B
                 if(records[i].result == 0 || records[i].result == 1){

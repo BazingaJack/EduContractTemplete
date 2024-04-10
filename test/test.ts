@@ -35,6 +35,28 @@ describe("Education Template Contract deployed", async function () {
         }
     }
 
+    async function deployAndRegisterMoreTeachers() {
+        const [deployer, undergraduate, postgraduate, phd, teacher1, teacher2, teacher3, teacher4, teacher5, teacher6, manangement] = await ethers.getSigners();
+        const EduTemplate = await ethers.getContractFactory("EduTemplate");
+        const edutemplate = await EduTemplate.deploy();
+
+        await edutemplate.connect(deployer).stuRegister(undergraduate.address,"stu1",20,"cs","undergraduate");
+        await edutemplate.connect(deployer).stuRegister(postgraduate.address,"stu2",25,"cs","postgraduate");
+        await edutemplate.connect(deployer).stuRegister(phd.address,"stu3",28,"cs","phd");
+        await edutemplate.connect(deployer).thrRegister(teacher1.address,"thr1",30,"cs");
+        await edutemplate.connect(deployer).thrRegister(teacher2.address,"thr2",30,"cs");
+        await edutemplate.connect(deployer).thrRegister(teacher3.address,"thr3",30,"cs");
+        await edutemplate.connect(deployer).thrRegister(teacher4.address,"thr4",30,"cs");
+        await edutemplate.connect(deployer).thrRegister(teacher5.address,"thr5",30,"cs");
+        await edutemplate.connect(deployer).thrRegister(teacher6.address,"thr6",30,"cs");
+        await edutemplate.connect(deployer).mgrRegister(manangement.address,"mgr1","cs");
+    
+        return {
+            edutemplate,
+            accounts : {deployer, undergraduate, postgraduate, phd, teacher1, teacher2, teacher3, teacher4, teacher5, teacher6, manangement}
+        }
+    }
+
     describe("Role test",async function () {
         it("Should register student successfully",async function () {
             const {edutemplate,accounts} = await loadFixture(deployContracts);
@@ -129,15 +151,23 @@ describe("Education Template Contract deployed", async function () {
             expect (grade2).to.be.equal(50);
         })
 
-        it("Should review thesis successfully",async function () {
+        it("Should be reverted because teacher couldn't review his student's thesis",async function () {
             const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
             await edutemplate.connect(accounts.undergraduate).thesisInitialize(accounts.teacher.address,"Title","Content");
             await edutemplate.connect(accounts.undergraduate).modifyThesis("Modified Content");
             await edutemplate.connect(accounts.undergraduate).thesisSubmit();
-            await edutemplate.connect(accounts.teacher).reviewThesis(accounts.undergraduate.address,3);
+            await expect (edutemplate.connect(accounts.teacher).reviewThesis(accounts.undergraduate.address,3)).to.be.revertedWith("Error: You can't review your student's thesis.");
+        })
+
+        it("Should review thesis successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.undergraduate).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.undergraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.undergraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.undergraduate.address,3);
             const teacherAddress = (await edutemplate.thesisResults(0,0)).thrAddr;
             const res = (await edutemplate.thesisResults(0,0)).result;
-            expect (teacherAddress).to.be.equal(accounts.teacher.address);
+            expect (teacherAddress).to.be.equal(accounts.teacher2.address);
             expect (res).to.be.equal(3);
         })
 
@@ -212,4 +242,105 @@ describe("Education Template Contract deployed", async function () {
         
     })
 
+    describe("Graduation qualification review relevant test",async function () {
+        it("Should be reverted because grade verification failed",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            await edutemplate.connect(accounts.undergraduate).selectCourse(0);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.undergraduate.address,0,50);
+            await expect (edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.undergraduate.address)).to.be.revertedWith("Error: Invalid status.");
+        })
+
+        it("Should be reverted because thesis hasn't been reviewed totally",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.undergraduate).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.undergraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.undergraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.undergraduate.address,2);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.undergraduate.address,0);
+            await expect (edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.undergraduate.address)).to.be.revertedWith("Error: Your thesis hasn't been reviewed yet.");
+        })
+
+        it("Should be reverted because undergraduate's thesis hasn't reached the standard",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.undergraduate).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.undergraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.undergraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.undergraduate.address,2);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.undergraduate.address,0);
+            await edutemplate.connect(accounts.teacher4).reviewThesis(accounts.undergraduate.address,1);
+            await edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.undergraduate.address);
+            const status = (await edutemplate.stuSets(accounts.undergraduate.address)).isGraduated;
+            expect (status).to.be.equal(false);
+        })
+
+        it("Should undergraduate pass the graduation verification",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.undergraduate).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.undergraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.undergraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.undergraduate.address,2);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.undergraduate.address,1);
+            await edutemplate.connect(accounts.teacher4).reviewThesis(accounts.undergraduate.address,1);
+            await edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.undergraduate.address);
+            const status = (await edutemplate.stuSets(accounts.undergraduate.address)).isGraduated;
+            expect (status).to.be.equal(true);
+        })
+
+        it("Should be reverted because postgraduate's thesis hasn't reached the standard",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.postgraduate).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.postgraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.postgraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.undergraduate.address,2);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.undergraduate.address,3);
+            await edutemplate.connect(accounts.teacher4).reviewThesis(accounts.undergraduate.address,1);
+            await edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.postgraduate.address);
+            const status = (await edutemplate.stuSets(accounts.undergraduate.address)).isGraduated;
+            expect (status).to.be.equal(false);
+        })
+
+        it("Should postgraduate pass the graduation verification",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.postgraduate).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.postgraduate).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.postgraduate).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.postgraduate.address,3);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.postgraduate.address,3);
+            await edutemplate.connect(accounts.teacher4).reviewThesis(accounts.postgraduate.address,1);
+            await edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.postgraduate.address);
+            const status = (await edutemplate.stuSets(accounts.postgraduate.address)).isGraduated;
+            expect (status).to.be.equal(true);
+        })
+
+        it("Should be reverted because phd's thesis hasn't reached the standard",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.phd).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.phd).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.phd).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.phd.address,3);
+            await edutemplate.connect(accounts.teacher4).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.teacher5).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.teacher6).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.phd.address);
+            const status = (await edutemplate.stuSets(accounts.phd.address)).isGraduated;
+            expect (status).to.be.equal(false);
+        })
+
+        it("Should phd pass the graduation verification",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterMoreTeachers);
+            await edutemplate.connect(accounts.phd).thesisInitialize(accounts.teacher1.address,"Title","Content");
+            await edutemplate.connect(accounts.phd).modifyThesis("Modified Content");
+            await edutemplate.connect(accounts.phd).thesisSubmit();
+            await edutemplate.connect(accounts.teacher2).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.teacher3).reviewThesis(accounts.phd.address,3);
+            await edutemplate.connect(accounts.teacher4).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.teacher5).reviewThesis(accounts.phd.address,3);
+            await edutemplate.connect(accounts.teacher6).reviewThesis(accounts.phd.address,2);
+            await edutemplate.connect(accounts.manangement).reviewGraduateQualification(accounts.phd.address);
+            const status = (await edutemplate.stuSets(accounts.phd.address)).isGraduated;
+            expect (status).to.be.equal(true);
+        })
+    })
 });
