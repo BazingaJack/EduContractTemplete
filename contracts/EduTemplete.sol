@@ -65,7 +65,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
         uint256 id;
         string name;
         uint256 amount;
-        address[] applyer;//todo
+        uint256 applyernum;
         address winer;
         uint256 status;//0:initialize 1:gainer chosen,waiting for distribute 2:distributed
     }
@@ -94,6 +94,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     mapping(address => mapping(uint256 => uint256)) public stuGrades;
     mapping(uint256 => mapping(address => bool)) public courseStuSets;
     mapping(uint256 => scholarship) public scholarships;
+    mapping(uint256 => mapping(uint256 => address)) public scholarshipApplyers;
     mapping(uint256 => mapping(address => uint256)) public applyList;
     mapping(uint256 => thesis) public thesisSets;
     mapping(uint256 => reviewRecord[]) public thesisResults;
@@ -182,7 +183,9 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     function applyScholarship(uint256 _scholarshipId) public onlyRole(roles[0]) {
         require(_scholarshipId < nextScholarshipId && _scholarshipId >= 0,"Error: Invalid scholarship id.");
         require(applyList[_scholarshipId][msg.sender] == 0,"Error: You have applied for this scholarship.");
-        scholarships[_scholarshipId].applyer.push(msg.sender);
+        uint256 applyerId = scholarships[_scholarshipId].applyernum;
+        scholarshipApplyers[_scholarshipId][applyerId] = msg.sender;
+        scholarships[_scholarshipId].applyernum++;
         applyList[_scholarshipId][msg.sender] = stuSets[msg.sender].averageGrade;
     }
 
@@ -263,8 +266,7 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     }
 
     function addScholarship(string memory _name,uint256 _amount) public onlyRole(roles[2]) {
-        address[] memory applyer;
-        scholarship memory s = scholarship(nextScholarshipId,_name,_amount,applyer,address(0),0);
+        scholarship memory s = scholarship(nextScholarshipId,_name,_amount,0,address(0),0);
         scholarships[nextScholarshipId] = s;
         nextScholarshipId++;
     }
@@ -272,12 +274,12 @@ contract EduTemplate is AccessControlDefaultAdminRules{
     function chooseCandidate(uint256 _scholarshipId) public onlyRole(roles[2]) {
         require(_scholarshipId < nextScholarshipId && _scholarshipId >= 0,"Error: Invalid scholarship id.");
         require(scholarships[_scholarshipId].status == 0,"Error: This scholarship has already been processed.");
-        require(scholarships[_scholarshipId].applyer.length > 0,"Error: This scholarship hasn't applyer yet.");
-        address winer = scholarships[_scholarshipId].applyer[0];
+        require(scholarships[_scholarshipId].applyernum > 0,"Error: This scholarship hasn't applyer yet.");
+        address winer = scholarshipApplyers[_scholarshipId][0];
         uint256 maxGrade = stuSets[winer].averageGrade;
-        if(scholarships[_scholarshipId].applyer.length >= 2){
-            for(uint256 i = 1;i < scholarships[_scholarshipId].applyer.length;i++){//todo
-                address s = scholarships[_scholarshipId].applyer[i];
+        if(scholarships[_scholarshipId].applyernum >= 2){
+            for(uint256 i = 1;i < scholarships[_scholarshipId].applyernum;i++){//todo
+                address s = scholarshipApplyers[_scholarshipId][i];
                 if(maxGrade < stuSets[s].averageGrade){
                     winer = s;
                     maxGrade = stuSets[s].averageGrade;

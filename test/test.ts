@@ -143,4 +143,73 @@ describe("Education Template Contract deployed", async function () {
 
     })
 
+    describe("Manangement relevant basic function test",async function () {
+        it("Should add scholarship successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.manangement).addScholarship("scholarship1",10000);
+            const name = (await edutemplate.scholarships(0)).name;
+            const amount = (await edutemplate.scholarships(0)).amount;
+            expect (name).to.be.equal("scholarship1");
+            expect (amount).to.be.equal(10000);
+            expect (await edutemplate.nextScholarshipId()).to.be.equal(1);
+        })
+        
+        it("Should apply scholarship successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            await edutemplate.connect(accounts.undergraduate).selectCourse(0);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.undergraduate.address,0,90);
+            await edutemplate.connect(accounts.manangement).addScholarship("scholarship1",10000);
+            await edutemplate.connect(accounts.undergraduate).applyScholarship(0);
+            const num = (await edutemplate.scholarships(0)).applyernum;
+            expect (num).to.be.equal(1);
+            const applyer = await edutemplate.scholarshipApplyers(0,0);
+            expect (applyer).to.be.equal(accounts.undergraduate.address);
+            const grade = (await edutemplate.applyList(0,accounts.undergraduate.address));
+            expect (grade).to.be.equal(90);
+        })
+
+        it("Should choose candidate successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            await edutemplate.connect(accounts.undergraduate).selectCourse(0);
+            await edutemplate.connect(accounts.postgraduate).selectCourse(0);
+            await edutemplate.connect(accounts.phd).selectCourse(0);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.undergraduate.address,0,90);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.postgraduate.address,0,80);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.phd.address,0,95);
+            await edutemplate.connect(accounts.manangement).addScholarship("scholarship1",10000);
+            await edutemplate.connect(accounts.undergraduate).applyScholarship(0);
+            await edutemplate.connect(accounts.postgraduate).applyScholarship(0);
+            await edutemplate.connect(accounts.phd).applyScholarship(0);
+            await edutemplate.connect(accounts.manangement).chooseCandidate(0);
+            const winer = (await edutemplate.scholarships(0)).winer;
+            const status = (await edutemplate.scholarships(0)).status;
+            expect (winer).to.be.equal(accounts.phd.address);
+            expect (status).to.be.equal(1);
+        })
+
+        it("Should distribute scholarship successfully",async function () {
+            const {edutemplate,accounts} = await loadFixture(deployAndRegisterAll);
+            await edutemplate.connect(accounts.teacher).registerCourse("Course1",2);
+            await edutemplate.connect(accounts.undergraduate).selectCourse(0);
+            await edutemplate.connect(accounts.postgraduate).selectCourse(0);
+            await edutemplate.connect(accounts.phd).selectCourse(0);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.undergraduate.address,0,90);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.postgraduate.address,0,80);
+            await edutemplate.connect(accounts.teacher).recordScores(accounts.phd.address,0,95);
+            await edutemplate.connect(accounts.manangement).addScholarship("scholarship1",10000);
+            await edutemplate.connect(accounts.undergraduate).applyScholarship(0);
+            await edutemplate.connect(accounts.postgraduate).applyScholarship(0);
+            await edutemplate.connect(accounts.phd).applyScholarship(0);
+            await edutemplate.connect(accounts.manangement).chooseCandidate(0);
+            await edutemplate.connect(accounts.manangement).distributeScholarship(0);
+            const amount = (await edutemplate.stuSets(accounts.phd.address)).scholarshipAmount;
+            const status = (await edutemplate.scholarships(0)).status;
+            expect (amount).to.be.equal(10000);
+            expect (status).to.be.equal(2);
+        })
+        
+    })
+
 });
