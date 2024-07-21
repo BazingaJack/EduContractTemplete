@@ -1,6 +1,7 @@
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@nomicfoundation/hardhat-chai-matchers";
+import "@nomicfoundation/hardhat-ignition";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -13,17 +14,11 @@ const config: HardhatUserConfig = {
     },
   },
   networks: {
-    hardhat: {},
-    goerli: {
-      url: 'https://goerli.infura.io/v3/9aa3d95b3bc440fa88ea12eaa4456161',
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
+    localhost: {
+      url: "http://127.0.0.1:8545"
     },
-    scrollSepolia: {
-      url: "https://sepolia-rpc.scroll.io/" || "",
-      accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
-    },
-    manta:{
-      url: "https://pacific-rpc.testnet.manta.network/http",
+    sepolia: {
+      url: 'https://sepolia.infura.io/v3/e45c5cb64e5a4a6c9b6218358c529b65',
       accounts: process.env.PRIVATE_KEY !== undefined ? [process.env.PRIVATE_KEY] : [],
     }
   },
